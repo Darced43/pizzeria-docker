@@ -1,0 +1,190 @@
+openapi: 3.0.3
+info:
+  title: Pizza Orders API
+  version: 1.0.0
+  description: API для управления заказами на пиццу
+
+servers:
+  - url: http://localhost:8080
+
+components:
+  securitySchemes:
+    XAuth:
+      type: apiKey
+      in: header
+      name: X-Auth-Key
+  schemas:
+    Order:
+      type: object
+      properties:
+        order_id:
+          type: string
+          maxLength: 15
+          description: Уникальный ID заказа
+          example: "09bb1eaeefbd7e5"
+        items:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 5000
+          description: Массив id товаров
+          example: [1,2,3,3]
+        done:
+          type: boolean
+          description: Флаг готовности заказа
+          example: false
+
+paths:
+  /orders:
+    post:
+      summary: Создание нового заказа
+      description: Создание заказа клиентом. Список товаров не может быть пустой.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - items
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: integer
+                    minimum: 1
+                    maximum: 5000
+                  minItems: 1
+                  example: [1,2,3,3]
+      responses:
+        '200':
+          description: Заказ успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+    get:
+      summary: Получение списка заказов
+      description: Список всех заказов. Можно фильтровать по полю `done`. Требуется `X-Auth-Key`.
+      security:
+        - XAuth: [ ]
+      parameters:
+        - name: done
+          in: query
+          required: false
+          schema:
+            type: integer
+            enum: [ 0, 1 ]
+            description: Фильтр по готовности (0 = не готов, 1 = готов)
+      responses:
+        '200':
+          description: Список заказов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    order_id:
+                      type: string
+                    done:
+                      type: boolean
+                  example:
+                    - order_id: "12345"
+                      done: true
+                    - order_id: "45678"
+                      done: false
+        '401':
+          description: Ошибка авторизации
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  error: "Неверный ключ доступа"
+
+  /orders/{order_id}/items:
+    post:
+      summary: Добавление товаров в заказ
+      description: Добавление товаров в заказ. Добавить можно только если `done = false`.
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 5000
+              minItems: 1
+              example: [4,7,8]
+      responses:
+        '200':
+          description: Товары успешно добавлены
+        '400':
+          description: Ошибка добавления (например, заказ завершён)
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  error: "Нельзя изменить завершённый заказ"
+
+  /orders/{order_id}:
+    get:
+      summary: Получение информации о заказе
+      description: Возвращает данные одного заказа
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Данные заказа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{order_id}/done:
+    post:
+      summary: Пометить заказ как выполненный
+      description: Повар завершает заказ. Требуется `X-Auth-Key`.
+      security:
+        - XAuth: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Заказ успешно завершён
+        '400':
+          description: Заказ уже завершён или не может быть завершён
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  error: "Заказ уже выполнен"
+        '401':
+          description: Ошибка авторизации
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  error: "Неверный ключ доступа"
